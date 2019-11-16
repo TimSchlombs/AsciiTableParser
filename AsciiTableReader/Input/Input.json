@@ -1,0 +1,9 @@
+{
+  "startLine": 2,
+  "endLine": 35,
+  "valueColumn":7, 
+  "asciiFiles": {
+    "fileSet0":  ["Input/input1.txt" ,  "Input/Input2.txt" , "ComparisonSet1And2"],
+    "fileSet1":  ["Input/input3.txt" ,  "Input/Input4.txt" , "ComparisonSet3And4"] 
+  }
+}
