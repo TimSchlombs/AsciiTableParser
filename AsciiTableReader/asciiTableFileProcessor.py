@@ -4,36 +4,24 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as m_patches
 import numpy as np
 import json
+import getopt
 
 
-# function to return an array for a given column in ASCII file
-def get_values(file_path, start_line, end_line, value_column):
-    # setting type
-    valueFromFile = []
-    # check if file exists
-    if not os.path.isfile(file_path):
-        print("File path {} does not exist. Exiting...".format(file_path))
-        sys.exit()
-    # open file and read line by line with start and end line, where splitting shall happen
+# function to get input arguments
+def get_inputs(argv):
+    in_file = None
     try:
-        with open(file_path) as fp:
-            dataAscii = fp.readlines()
-            for line in dataAscii[start_line:end_line]:
-                lineSplit = line.split()
-                valueFromFile.append(lineSplit[value_column])
-    except IndexError:
-        print('Indexes are incorrect: ', start_line, end_line, value_column)
-        sys.exit()
-    except IOError:
-        print('Can´t open file: ', file_path)
-        sys.exit()
-    except Exception as e1:
-        print('Unknown bug: ', e1)
-        sys.exit()
-
-    valueFromFile = list(np.float_(valueFromFile))
-    # turn string array into float array
-    return valueFromFile
+        opts, args = getopt.getopt(argv, "hi:", ["ifile="])
+    except getopt.GetoptError:
+        print('Error in defining input arguments --> asciiTableFileProcessor.py -i <inputfile> ')
+        sys.exit(-1)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('asciiTableFileProcessor.py -i <inputfile>')
+            sys.exit()
+        elif opt in ("-i", "--ifile"):
+            in_file = arg
+    return in_file
 
 
 # plotting curves
@@ -74,45 +62,82 @@ def calculate_percentage(array1, array2):
     return percentageDifferenceNpArray
 
 
-if __name__ == '__main__':
-    # noinspection PyTypeChecker
-    # opening input file
+# class to read an array for a given column in ASCII file
+class TableValues:
+    def __init__(self, file_path, start_line, end_line, value_column, plot_title):
+        self.file_path = file_path
+        self.start_line = start_line
+        self.end_line = end_line
+        self.value_column = value_column
+        self.plot_title = plot_title
 
-    try:
-        with open('Input/Input.json', 'r') as json_file:
-            data = json.load(json_file)
-    except IOError:
-        print('Can´t open file: ', json_file)
-        sys.exit()
-    except json.JSONDecodeError:
-        print("JSON input file is corrupt: ", json_file)
-    except Exception as e:
-        print('Unknown bug: ', e)
-        sys.exit()
-    try:
-        for x in range(len(data['asciiFiles'])):
-            # Set1 post processing
-            meanXValueSet1 = get_values(data['asciiFiles']['fileSet' + str(x)][0], data['startLine'], data['endLine'],
-                                        0)
-            meanYValueSet1 = get_values(data['asciiFiles']['fileSet' + str(x)][0], data['startLine'], data['endLine'],
-                                        data['valueColumn'])
+    # get values from ascii table
+    def get_values(self):
+        # setting type
+        valueFromFile = []
+        # check if file exists
+        if not os.path.isfile(self.file_path):
+            print("File path {} does not exist. Exiting...".format(self.file_path))
+            sys.exit()
+        # open file and read line by line with start and end line, where splitting shall happen
+        try:
+            with open(self.file_path) as fp:
+                dataAscii = fp.readlines()
+                for line in dataAscii[self.start_line:self.end_line]:
+                    lineSplit = line.split()
+                    valueFromFile.append(lineSplit[self.value_column])
+        except IndexError:
+            print('Indexes are incorrect: ', self.start_line, self.end_line, self.value_column)
+            sys.exit(-1)
+        except IOError:
+            print('Can´t open file: ', self.file_path)
+            sys.exit(-1)
+        except Exception as e1:
+            print('Unknown bug: ', e1)
+            sys.exit(-1)
 
-            # Set2 post processing
-            meanXValueSet2 = get_values(data['asciiFiles']['fileSet' + str(x)][1], data['startLine'], data['endLine'],
-                                        0)
-            meanYValueSet2 = get_values(data['asciiFiles']['fileSet' + str(x)][1], data['startLine'], data['endLine'],
-                                        data['valueColumn'])
+        valueFromFile = list(np.float_(valueFromFile))
+        # turn string array into float array
+        return valueFromFile
 
-            # Getting percentage difference between SR2 and SR3
-            percentageDifferenceSet1Set2 = calculate_percentage(meanYValueSet1, meanYValueSet2)
 
-            # plotting power curves
-            plotting_curve(meanXValueSet1, meanYValueSet1, 'Set1', meanXValueSet2, meanYValueSet2,
-                           'Set2', data['asciiFiles']['fileSet' + str(x)][2])
+# main call
+try:
+    input_file = get_inputs(sys.argv[1:])
+except Exception as e:
+    print('Unknown bug: ', e)
+    sys.exit(-1)
+# opening input file
+try:
+    with open(input_file, 'r') as json_file:
+        data = json.load(json_file)
+except IOError:
+    print('Can´t open file: ', json_file)
+    sys.exit(-1)
+except json.JSONDecodeError:
+    print("JSON input file is corrupt: ", json_file)
+except Exception as e:
+    print('Unknown bug: ', e)
+    sys.exit(-1)
+try:
+    for x in range(len(data['asciiFiles'])):
+        # Set1 post processing
+        setXAxis = TableValues(data['asciiFiles']['fileSet' + str(x)][0], data['startLine'], data['endLine'], 0, None)
+        set1 = TableValues(data['asciiFiles']['fileSet' + str(x)][0], data['startLine'], data['endLine'],
+                           data['valueColumn'], data['asciiFiles']['fileSet' + str(x)][2])
+        set2 = TableValues(data['asciiFiles']['fileSet' + str(x)][1], data['startLine'], data['endLine'],
+                           data['valueColumn'], data['asciiFiles']['fileSet' + str(x)][2])
 
-            # plotting differences in percentage in bar plot
-            plotting_bar(percentageDifferenceSet1Set2, meanXValueSet1, data['asciiFiles']['fileSet' + str(x)][2])
+        # Getting percentage difference between SR2 and SR3
+        percentageDifferenceSet1Set2 = calculate_percentage(set1.get_values(), set2.get_values())
 
-    except Exception as e:
-        print('Unknown bug: ', e)
-        sys.exit()
+        # plotting power curves
+        plotting_curve(setXAxis.get_values(), set1.get_values(), 'Set1', setXAxis.get_values(), set2.get_values(),
+                       'Set2', set2.plot_title)
+
+        # plotting differences in percentage in bar plot
+        plotting_bar(percentageDifferenceSet1Set2, setXAxis.get_values(), set2.plot_title)
+
+except Exception as e:
+    print('Unknown bug: ', e)
+    sys.exit(-1)
